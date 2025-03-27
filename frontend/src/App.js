@@ -1,14 +1,12 @@
 // src/App.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Container, Box, Button, Typography, Paper, Grid, IconButton, Divider, CircularProgress, Tooltip } from '@mui/material';
+import { Container, Box, Button, Typography, Paper, Tooltip } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PersonIcon from '@mui/icons-material/Person';
+import TimerIcon from '@mui/icons-material/Timer';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -21,6 +19,8 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [speakerCount, setSpeakerCount] = useState(0);
+  const [recordingStatus, setRecordingStatus] = useState('');
   
   const mediaRecorderRef = useRef(null);
   const socketRef = useRef(null);
@@ -40,10 +40,17 @@ function App() {
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
+      setRecordingStatus('Đang ghi âm...');
+    } else if (isRecording && isPaused) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      setRecordingStatus('Tạm dừng');
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      setRecordingStatus('');
     }
     
     return () => {
@@ -53,12 +60,21 @@ function App() {
     };
   }, [isRecording, isPaused]);
 
+  // Effect to count unique speakers
+  useEffect(() => {
+    if (transcriptions.length > 0) {
+      const uniqueSpeakers = new Set(transcriptions.map(t => t.speaker));
+      setSpeakerCount(uniqueSpeakers.size);
+    } else {
+      setSpeakerCount(0);
+    }
+  }, [transcriptions]);
+
   const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
   };
 
   const startRecording = async () => {
@@ -232,153 +248,135 @@ function App() {
     }
   };
 
-  const copyToClipboard = () => {
-    const text = transcriptions.map(t => `${t.speaker} (${new Date(t.timestamp * 1000).toLocaleTimeString()}): ${t.text}`).join('\n\n');
-    
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        alert('Transcription copied to clipboard!');
-      })
-      .catch(err => {
-        console.error('Error copying to clipboard:', err);
-        setError('Error copying to clipboard');
-      });
+  const analyzeTranscription = () => {
+    alert('Chức năng phân tích đang được phát triển!');
   };
 
   return (
-    <Container maxWidth="lg" className="app-container">
-      <Paper elevation={3} className="main-paper">
-        <Box className="header">
-          <Typography variant="h4" component="h1">
-            Meeting Recorder & Transcriber
-          </Typography>
-          
-          <Box className="timer-display">
-            <AccessTimeIcon />
-            <Typography variant="h6">
-              {formatTime(elapsedTime)}
-            </Typography>
-          </Box>
-        </Box>
-        
-        <Divider />
-        
-        <Grid container spacing={2} className="content-area">
-          <Grid item xs={12}>
-            <Box className="controls">
-              {!isRecording ? (
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  startIcon={<MicIcon />}
-                  onClick={startRecording}
-                  disabled={isLoading}
-                  className="control-button"
-                >
-                  Bắt đầu ghi âm
-                </Button>
-              ) : (
-                <>
-                  <Button 
-                    variant="outlined" 
-                    color="secondary" 
-                    startIcon={<StopIcon />}
-                    onClick={stopRecording}
-                    disabled={isLoading}
-                    className="control-button"
-                  >
-                    Kết thúc
-                  </Button>
-                  
-                  <Button 
-                    variant="outlined" 
-                    color="primary" 
-                    startIcon={isPaused ? <PlayArrowIcon /> : <PauseIcon />}
-                    onClick={pauseRecording}
-                    disabled={isLoading}
-                    className="control-button"
-                  >
-                    {isPaused ? 'Tiếp tục' : 'Tạm dừng'}
-                  </Button>
-                </>
-              )}
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Paper elevation={2} className="transcription-area">
-              <Typography variant="h6" className="section-title">
-                Bản ghi cuộc họp
+    <Container className="app-container">
+      <Paper elevation={1} className="app-wrapper">
+        <div className="app-content">
+          {/* Sidebar */}
+          <div className="sidebar">
+            <div className="logo-section">
+              <div className="audio-icon">
+                <div className="bar"></div>
+                <div className="bar"></div>
+                <div className="bar"></div>
+                <div className="bar"></div>
+                <div className="bar"></div>
+              </div>
+              <Typography variant="h5" className="app-title">
+                Meeting<br />Assistant
               </Typography>
-              
-              <Box className="transcription-content">
-                {transcriptions.length === 0 ? (
-                  <Typography variant="body1" className="empty-message">
-                    Chưa có nội dung được ghi lại. Bắt đầu ghi âm để xem bản ghi tại đây.
-                  </Typography>
-                ) : (
-                  transcriptions.map((item, index) => (
-                    <Box key={index} className="transcription-item">
+            </div>
+
+            <Button 
+              variant="contained"
+              className="control-button record-button"
+              startIcon={<MicIcon />}
+              onClick={startRecording}
+              disabled={isRecording || isLoading}
+            >
+              Bắt đầu ghi âm
+            </Button>
+
+            <Button 
+              variant="outlined" 
+              className="control-button stop-button"
+              startIcon={<StopIcon />}
+              onClick={stopRecording}
+              disabled={!isRecording || isLoading}
+            >
+              Dừng ghi âm
+            </Button>
+
+            <div className="timer-container">
+              <div className="timer-display">
+                {formatTime(elapsedTime)}
+              </div>
+              {recordingStatus && (
+                <div className="recording-status">
+                  <div className={`recording-indicator ${isRecording && !isPaused ? 'pulse' : ''}`}></div>
+                  <span>{recordingStatus}</span>
+                </div>
+              )}
+            </div>
+
+            <Button 
+              variant="outlined"
+              className="control-button analyze-button"
+              startIcon={<AnalyticsIcon />}
+              onClick={analyzeTranscription}
+              disabled={isLoading || transcriptions.length === 0}
+            >
+              Phân tích
+            </Button>
+
+            <Button 
+              variant="outlined"
+              className="control-button export-button"
+              startIcon={<DownloadIcon />}
+              onClick={() => exportTranscription('txt')}
+              disabled={isLoading || transcriptions.length === 0}
+            >
+              Xuất file TXT
+            </Button>
+
+            {transcriptions.length > 0 && (
+              <div className="stats-container">
+                <Tooltip title="Số người nói">
+                  <div className="stat-item">
+                    <PersonIcon fontSize="small" />
+                    <span>{speakerCount} người nói</span>
+                  </div>
+                </Tooltip>
+                <Tooltip title="Thời lượng">
+                  <div className="stat-item">
+                    <TimerIcon fontSize="small" />
+                    <span>{formatTime(elapsedTime)}</span>
+                  </div>
+                </Tooltip>
+              </div>
+            )}
+          </div>
+
+          {/* Transcript area */}
+          <div className="transcript-area">
+            <Typography variant="h5" className="transcript-title">
+              Transcript
+            </Typography>
+            
+            <div className="transcript-content">
+              {transcriptions.length === 0 ? (
+                <Typography variant="body1" className="empty-message">
+                  Chưa có nội dung được ghi lại. Bắt đầu ghi âm để xem bản ghi tại đây.
+                </Typography>
+              ) : (
+                transcriptions.map((item, index) => (
+                  <div key={index} className="transcript-item">
+                    <div className="transcript-header">
                       <Typography variant="subtitle2" className="speaker-info">
-                        {item.speaker} ({new Date(item.timestamp * 1000).toLocaleTimeString()})
+                        {item.speaker}
                       </Typography>
-                      <Typography variant="body1" className="transcription-text">
-                        {item.text}
+                      <Typography variant="caption" className="timestamp">
+                        {new Date(item.timestamp * 1000).toLocaleTimeString()}
                       </Typography>
-                    </Box>
-                  ))
-                )}
-                <div ref={transcriptionEndRef} />
-              </Box>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Box className="action-buttons">
-              <Tooltip title="Lưu bản ghi dưới dạng văn bản">
-                <IconButton 
-                  color="primary"
-                  onClick={() => exportTranscription('txt')}
-                  disabled={isLoading || transcriptions.length === 0}
-                >
-                  <SaveIcon />
-                </IconButton>
-              </Tooltip>
-              
-              <Tooltip title="Tải xuống bản ghi (JSON)">
-                <IconButton 
-                  color="primary"
-                  onClick={() => exportTranscription('json')}
-                  disabled={isLoading || transcriptions.length === 0}
-                >
-                  <DownloadIcon />
-                </IconButton>
-              </Tooltip>
-              
-              <Tooltip title="Sao chép vào clipboard">
-                <IconButton 
-                  color="primary"
-                  onClick={copyToClipboard}
-                  disabled={isLoading || transcriptions.length === 0}
-                >
-                  <ContentCopyIcon />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Grid>
-        </Grid>
+                    </div>
+                    <Typography variant="body1" className="transcript-text">
+                      {item.text}
+                    </Typography>
+                  </div>
+                ))
+              )}
+              <div ref={transcriptionEndRef} />
+            </div>
+          </div>
+        </div>
         
-        {isLoading && (
-          <Box className="loading-overlay">
-            <CircularProgress />
-          </Box>
-        )}
-        
-        {error && (
-          <Box className="error-message">
-            <Typography color="error">{error}</Typography>
-          </Box>
-        )}
+        <div className="app-footer">
+          2025 General Technology
+        </div>
       </Paper>
     </Container>
   );
